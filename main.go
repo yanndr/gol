@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"time"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 const (
-	gridSize = 20
+	gridSize = 40
 	widht    = 800
 	height   = 800
 )
@@ -29,31 +29,46 @@ func main() {
 	defer window.Destroy()
 
 	space[15][15] = true
-	space[15][16] = true
-	space[15][17] = true
+	space[16][15] = true
+	space[17][15] = true
+	space[18][15] = true
+	space[19][15] = true
 
 	//for it := 0; it < 1; it++ {
+	c := sdl.Color{R: 255, G: 255, B: 0, A: 128}
 
 	copy = space
-	fmt.Println(copy[15][15])
-	fmt.Println(copy[15][16])
-	fmt.Println(copy[15][17])
-	r.Clear()
-	size := widht / gridSize
 
-	for i := 0; i < len(space)-1; i++ {
-		drawLine(r, int32((i+1)*size), int32(0), int32((i+1)*size), int32(height))
-		for j := 0; j < len(space[0])-1; j++ {
-			drawLine(r, int32(0), int32((j+1)*size), int32(widht), int32((j+1)*size))
-			an := numberOfAliveNeigbour(i, j)
-			if copy[i][j] {
-				space[i][j] = an > 1 && an < 4
-			} else {
-				space[i][j] = an == 3
+	size := widht / gridSize
+	go func() {
+		for {
+			copy = space
+			r.SetDrawColor(0, 0, 0, 255)
+			r.Clear()
+			r.SetDrawColor(0, 255, 0, 255)
+			for i := 0; i < len(space)-1; i++ {
+				r.SetDrawColor(0, 255, 0, 255)
+				r.DrawLine(int32((i+1)*size), int32(0), int32((i+1)*size), int32(height))
+				for j := 0; j < len(space[0])-1; j++ {
+					r.SetDrawColor(0, 255, 0, 255)
+					r.DrawLine(int32(0), int32((j+1)*size), int32(widht), int32((j+1)*size))
+					an := numberOfAliveNeigbour(i, j)
+					if copy[i][j] {
+						// cell := sdl.Rect{X: int32((i + 1) * size), Y: int32((j + 1) * size), H: int32(size), W: int32(size)}
+						// r.SetDrawColor(0, 255, 0, 128)
+						// r.DrawRect(&cell)
+						gfx.BoxColor(r, int32((i+1)*size), int32((j+1)*size), int32((i+1)*size+size), int32((j+1)*size+size), c)
+						space[i][j] = an > 1 && an < 4
+					} else {
+						space[i][j] = an == 3
+					}
+				}
 			}
+			r.Present()
+			time.Sleep(time.Second / 2)
 		}
-	}
-	r.Present()
+	}()
+
 	// fmt.Println(space[15][15])
 	// fmt.Println(space[15][16])
 	// fmt.Println(space[15][17])
@@ -71,13 +86,6 @@ func main() {
 			}
 		}
 	}
-}
-
-func drawLine(r *sdl.Renderer, x1, y1, x2, y2 int32) {
-
-	c := sdl.Color{R: 0, G: 255, B: 0, A: 255}
-	gfx.LineColor(r, x1, y1, x2, y2, c)
-
 }
 
 func numberOfAliveNeigbour(x, y int) int {
