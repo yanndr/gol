@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/veandco/go-sdl2/gfx"
@@ -8,12 +10,13 @@ import (
 )
 
 const (
-	gridSize = 40
-	widht    = 800
-	height   = 800
+	gridWidth  = 120
+	gridHeight = 100
+	width      = 800
+	height     = 600
 )
 
-var space, copy [gridSize][gridSize]bool
+var space, copy [gridWidth][gridHeight]bool
 
 func main() {
 
@@ -22,42 +25,65 @@ func main() {
 	}
 	defer sdl.Quit()
 
-	window, r, err := sdl.CreateWindowAndRenderer(widht, height, sdl.WINDOW_SHOWN)
+	window, r, err := sdl.CreateWindowAndRenderer(width, height, sdl.WINDOW_SHOWN)
 	if err != nil {
 		panic(err)
 	}
 	defer window.Destroy()
 
-	space[15][15] = true
-	space[16][15] = true
-	space[17][15] = true
-	space[18][15] = true
-	space[19][15] = true
-
-	//for it := 0; it < 1; it++ {
-	c := sdl.Color{R: 255, G: 255, B: 0, A: 128}
+	for i := 0; i < len(space)-1; i++ {
+		for j := 0; j < len(space[0])-1; j++ {
+			space[i][j] = rand.Float32() > 0.6
+		}
+	}
+	c := sdl.Color{R: 255, G: 255, B: 0, A: 255}
 
 	copy = space
+	var cellSize int
+	if width/gridWidth < height/gridHeight {
+		cellSize = width / gridWidth
+	} else {
+		cellSize = height / gridHeight
+	}
+	fmt.Println(cellSize)
 
-	size := widht / gridSize
+	wstart := (width - cellSize*gridWidth) / 2
+	hstart := (height - cellSize*gridHeight) / 2
+	wend := wstart + cellSize*gridWidth
+	hend := hstart + cellSize*gridHeight
+
+	gridpxW := cellSize * gridWidth
+	gridpxH := cellSize * gridHeight
+
+	scale := float32(1.0)
+
 	go func() {
+
 		for {
 			copy = space
 			r.SetDrawColor(0, 0, 0, 255)
 			r.Clear()
-			r.SetDrawColor(0, 255, 0, 255)
+
+			r.SetScale(scale, scale)
+			r.SetDrawColor(0, 255, 255, 255)
+			r.DrawLine(int32(wstart), int32(hstart), int32(wend), int32(hstart))
+			r.DrawLine(int32(wstart), int32(hstart), int32(wstart), int32(hend))
+			r.DrawLine(int32(wend), int32(hstart), int32(wend), int32(hend))
+			r.DrawLine(int32(wstart), int32(hend), int32(wend), int32(hend))
 			for i := 0; i < len(space)-1; i++ {
 				r.SetDrawColor(0, 255, 0, 255)
-				r.DrawLine(int32((i+1)*size), int32(0), int32((i+1)*size), int32(height))
+				r.DrawLine(int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(gridpxH))
 				for j := 0; j < len(space[0])-1; j++ {
 					r.SetDrawColor(0, 255, 0, 255)
-					r.DrawLine(int32(0), int32((j+1)*size), int32(widht), int32((j+1)*size))
+
+					r.DrawLine(int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize))
 					an := numberOfAliveNeigbour(i, j)
 					if copy[i][j] {
 						// cell := sdl.Rect{X: int32((i + 1) * size), Y: int32((j + 1) * size), H: int32(size), W: int32(size)}
 						// r.SetDrawColor(0, 255, 0, 128)
 						// r.DrawRect(&cell)
-						gfx.BoxColor(r, int32((i+1)*size), int32((j+1)*size), int32((i+1)*size+size), int32((j+1)*size+size), c)
+
+						gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), c)
 						space[i][j] = an > 1 && an < 4
 					} else {
 						space[i][j] = an == 3
@@ -65,7 +91,7 @@ func main() {
 				}
 			}
 			r.Present()
-			time.Sleep(time.Second / 2)
+			time.Sleep(time.Second / 8)
 		}
 	}()
 
@@ -83,7 +109,12 @@ func main() {
 				println("Quit")
 				running = false
 				break
+			case *sdl.MouseWheelEvent:
+				mwe := event.(*sdl.MouseWheelEvent)
+				fmt.Println(mwe.Y)
+				scale = scale + float32(mwe.Y)/10
 			}
+
 		}
 	}
 }
