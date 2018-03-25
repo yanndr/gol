@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -10,10 +9,10 @@ import (
 )
 
 const (
-	gridWidth  = 120
-	gridHeight = 100
-	width      = 800
-	height     = 600
+	gridWidth  = 300
+	gridHeight = 300
+	width      = 1280
+	height     = 1084
 )
 
 var space, copy [gridWidth][gridHeight]bool
@@ -33,7 +32,7 @@ func main() {
 
 	for i := 0; i < len(space)-1; i++ {
 		for j := 0; j < len(space[0])-1; j++ {
-			space[i][j] = rand.Float32() > 0.6
+			space[i][j] = rand.Float32() > 0.85
 		}
 	}
 	c := sdl.Color{R: 255, G: 255, B: 0, A: 255}
@@ -45,26 +44,30 @@ func main() {
 	} else {
 		cellSize = height / gridHeight
 	}
-	fmt.Println(cellSize)
 
-	wstart := (width - cellSize*gridWidth) / 2
-	hstart := (height - cellSize*gridHeight) / 2
-	wend := wstart + cellSize*gridWidth
-	hend := hstart + cellSize*gridHeight
-
-	gridpxW := cellSize * gridWidth
-	gridpxH := cellSize * gridHeight
-
-	scale := float32(1.0)
-
+	//scale := float32(1.0)
+	vpx, vpy := 0, 0
 	go func() {
 
 		for {
+
+			wstart := (width - cellSize*gridWidth) / 2
+			hstart := (height - cellSize*gridHeight) / 2
+			wstart += vpx
+			hstart += vpy
+			wend := wstart + cellSize*gridWidth
+			hend := hstart + cellSize*gridHeight
+
+			gridpxW := cellSize * gridWidth
+			gridpxH := cellSize * gridHeight
+
 			copy = space
 			r.SetDrawColor(0, 0, 0, 255)
 			r.Clear()
 
-			r.SetScale(scale, scale)
+			//r.SetScale(scale, scale)
+
+			//r.SetViewport(&sdl.Rect{X: int32(vpx), Y: int32(vpy), W: int32(width + 1), H: int32(height + 1)})
 			r.SetDrawColor(0, 255, 255, 255)
 			r.DrawLine(int32(wstart), int32(hstart), int32(wend), int32(hstart))
 			r.DrawLine(int32(wstart), int32(hstart), int32(wstart), int32(hend))
@@ -72,11 +75,14 @@ func main() {
 			r.DrawLine(int32(wstart), int32(hend), int32(wend), int32(hend))
 			for i := 0; i < len(space)-1; i++ {
 				r.SetDrawColor(0, 255, 0, 255)
-				r.DrawLine(int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(gridpxH))
+				if cellSize > 15 {
+					r.DrawLine(int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH))
+				}
 				for j := 0; j < len(space[0])-1; j++ {
 					r.SetDrawColor(0, 255, 0, 255)
-
-					r.DrawLine(int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize))
+					if cellSize > 15 {
+						r.DrawLine(int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize))
+					}
 					an := numberOfAliveNeigbour(i, j)
 					if copy[i][j] {
 						// cell := sdl.Rect{X: int32((i + 1) * size), Y: int32((j + 1) * size), H: int32(size), W: int32(size)}
@@ -95,12 +101,6 @@ func main() {
 		}
 	}()
 
-	// fmt.Println(space[15][15])
-	// fmt.Println(space[15][16])
-	// fmt.Println(space[15][17])
-	// time.Sleep(time.Second)
-	//}
-
 	running := true
 	for running {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -111,10 +111,20 @@ func main() {
 				break
 			case *sdl.MouseWheelEvent:
 				mwe := event.(*sdl.MouseWheelEvent)
-				fmt.Println(mwe.Y)
-				scale = scale + float32(mwe.Y)/10
+				cellSize = int(int32(cellSize) + mwe.Y)
+				println(cellSize)
+			case *sdl.KeyboardEvent:
+				ke := event.(*sdl.KeyboardEvent)
+				if ke.Keysym.Scancode == 79 {
+					vpx = vpx - 10
+				} else if ke.Keysym.Scancode == 80 {
+					vpx = vpx + 10
+				} else if ke.Keysym.Scancode == 81 {
+					vpy = vpy - 10
+				} else if ke.Keysym.Scancode == 82 {
+					vpy = vpy + 10
+				}
 			}
-
 		}
 	}
 }
