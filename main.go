@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -10,14 +11,21 @@ import (
 
 const (
 	gridWidth  = 300
-	gridHeight = 300
+	gridHeight = 200
 	width      = 1280
 	height     = 1084
 )
 
-var space, copy [gridWidth][gridHeight]bool
-
 func main() {
+	var (
+		space, copy    [gridWidth][gridHeight]bool
+		bgColor        = sdl.Color{R: 0, G: 0, B: 0, A: 255}
+		gridEdgesColor = sdl.Color{R: 0, G: 255, B: 255, A: 255}
+		gridColor      = sdl.Color{R: 0, G: 255, B: 0, A: 255}
+		cellColorAlone = sdl.Color{R: 0, G: 255, B: 255, A: 255}
+		cellColorDying = sdl.Color{R: 255, G: 0, B: 0, A: 255}
+		cellColor      = sdl.Color{R: 255, G: 255, B: 0, A: 255}
+	)
 
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
@@ -30,12 +38,7 @@ func main() {
 	}
 	defer window.Destroy()
 
-	for i := 0; i < len(space)-1; i++ {
-		for j := 0; j < len(space[0])-1; j++ {
-			space[i][j] = rand.Float32() > 0.85
-		}
-	}
-	c := sdl.Color{R: 255, G: 255, B: 0, A: 255}
+	initGrindRandom(&space, 0.1)
 
 	copy = space
 	var cellSize int
@@ -46,9 +49,10 @@ func main() {
 	}
 
 	//scale := float32(1.0)
+	start := false
 	vpx, vpy := 0, 0
+	iteration := 0
 	go func() {
-
 		for {
 
 			wstart := (width - cellSize*gridWidth) / 2
@@ -62,41 +66,47 @@ func main() {
 			gridpxH := cellSize * gridHeight
 
 			copy = space
-			r.SetDrawColor(0, 0, 0, 255)
+			r.SetDrawColor(bgColor.R, bgColor.G, bgColor.B, bgColor.A)
 			r.Clear()
 
-			//r.SetScale(scale, scale)
+			drawGridEdges(r, int32(wstart), int32(hstart), int32(wend), int32(hend), gridEdgesColor)
 
-			//r.SetViewport(&sdl.Rect{X: int32(vpx), Y: int32(vpy), W: int32(width + 1), H: int32(height + 1)})
-			r.SetDrawColor(0, 255, 255, 255)
-			r.DrawLine(int32(wstart), int32(hstart), int32(wend), int32(hstart))
-			r.DrawLine(int32(wstart), int32(hstart), int32(wstart), int32(hend))
-			r.DrawLine(int32(wend), int32(hstart), int32(wend), int32(hend))
-			r.DrawLine(int32(wstart), int32(hend), int32(wend), int32(hend))
 			for i := 0; i < len(space)-1; i++ {
-				r.SetDrawColor(0, 255, 0, 255)
+				r.SetDrawColor(gridColor.R, gridColor.G, gridColor.B, gridColor.A)
 				if cellSize > 15 {
 					r.DrawLine(int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH))
 				}
 				for j := 0; j < len(space[0])-1; j++ {
-					r.SetDrawColor(0, 255, 0, 255)
+					r.SetDrawColor(gridColor.R, gridColor.G, gridColor.B, gridColor.A)
 					if cellSize > 15 {
 						r.DrawLine(int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize))
 					}
-					an := numberOfAliveNeigbour(i, j)
+					an := numberOfAliveNeigbour(&copy, i, j)
 					if copy[i][j] {
 						// cell := sdl.Rect{X: int32((i + 1) * size), Y: int32((j + 1) * size), H: int32(size), W: int32(size)}
 						// r.SetDrawColor(0, 255, 0, 128)
 						// r.DrawRect(&cell)
-
-						gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), c)
-						space[i][j] = an > 1 && an < 4
+						if an == 1 {
+							gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), cellColorAlone)
+						} else if an == 2 || an == 3 {
+							gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), cellColor)
+						} else {
+							gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), cellColorDying)
+						}
+						if start {
+							space[i][j] = an > 1 && an < 4
+						}
 					} else {
-						space[i][j] = an == 3
+						if start {
+							space[i][j] = an == 3
+						}
 					}
 				}
 			}
 			r.Present()
+			if start {
+				iteration++
+			}
 			time.Sleep(time.Second / 8)
 		}
 	}()
@@ -115,21 +125,37 @@ func main() {
 				println(cellSize)
 			case *sdl.KeyboardEvent:
 				ke := event.(*sdl.KeyboardEvent)
-				if ke.Keysym.Scancode == 79 {
+				switch ke.Keysym.Scancode {
+				case 79:
 					vpx = vpx - 10
-				} else if ke.Keysym.Scancode == 80 {
+				case 80:
 					vpx = vpx + 10
-				} else if ke.Keysym.Scancode == 81 {
+				case 81:
 					vpy = vpy - 10
-				} else if ke.Keysym.Scancode == 82 {
+				case 82:
 					vpy = vpy + 10
+				case 44:
+					if ke.State == 1 {
+						start = !start
+					}
+				default:
+					fmt.Println("unknow key:", ke.Keysym.Scancode)
 				}
+
 			}
 		}
 	}
 }
 
-func numberOfAliveNeigbour(x, y int) int {
+func initGrindRandom(grid *[gridWidth][gridHeight]bool, probability float32) {
+	for i := 0; i < len(grid)-1; i++ {
+		for j := 0; j < len(grid[0])-1; j++ {
+			grid[i][j] = rand.Float32() < probability
+		}
+	}
+}
+
+func numberOfAliveNeigbour(grid *[gridWidth][gridHeight]bool, x, y int) int {
 	num := 0
 	for i := -1; i < 2; i++ {
 		if x+i < 0 {
@@ -142,11 +168,18 @@ func numberOfAliveNeigbour(x, y int) int {
 			if i == 0 && j == 0 {
 				continue
 			}
-			if copy[x+i][y+j] {
+			if grid[x+i][y+j] {
 				num++
 			}
 		}
 	}
-
 	return num
+}
+
+func drawGridEdges(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {
+	r.SetDrawColor(c.R, c.G, c.B, c.A)
+	r.DrawLine(x, y, w, y)
+	r.DrawLine(x, y, x, h)
+	r.DrawLine(w, y, w, h)
+	r.DrawLine(x, h, w, h)
 }
