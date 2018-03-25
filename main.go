@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	gridWidth  = 300
-	gridHeight = 200
-	width      = 1280
-	height     = 1084
+	gridWidth   = 20
+	gridHeight  = 20
+	width       = 1280
+	height      = 1084
+	minGridCell = 8
 )
 
 func main() {
@@ -38,7 +39,7 @@ func main() {
 	}
 	defer window.Destroy()
 
-	initGrindRandom(&space, 0.1)
+	//initGrindRandom(&space, 0.1)
 
 	copy = space
 	var cellSize int
@@ -52,18 +53,19 @@ func main() {
 	start := false
 	vpx, vpy := 0, 0
 	iteration := 0
+	var wstart, hstart, wend, hend, gridpxW, gridpxH int
 	go func() {
 		for {
 
-			wstart := (width - cellSize*gridWidth) / 2
-			hstart := (height - cellSize*gridHeight) / 2
+			wstart = (width - cellSize*gridWidth) / 2
+			hstart = (height - cellSize*gridHeight) / 2
 			wstart += vpx
 			hstart += vpy
-			wend := wstart + cellSize*gridWidth
-			hend := hstart + cellSize*gridHeight
+			wend = wstart + cellSize*gridWidth
+			hend = hstart + cellSize*gridHeight
 
-			gridpxW := cellSize * gridWidth
-			gridpxH := cellSize * gridHeight
+			gridpxW = cellSize * gridWidth
+			gridpxH = cellSize * gridHeight
 
 			copy = space
 			r.SetDrawColor(bgColor.R, bgColor.G, bgColor.B, bgColor.A)
@@ -73,12 +75,12 @@ func main() {
 
 			for i := 0; i < len(space)-1; i++ {
 				r.SetDrawColor(gridColor.R, gridColor.G, gridColor.B, gridColor.A)
-				if cellSize > 15 {
+				if cellSize > minGridCell {
 					r.DrawLine(int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH))
 				}
 				for j := 0; j < len(space[0])-1; j++ {
 					r.SetDrawColor(gridColor.R, gridColor.G, gridColor.B, gridColor.A)
-					if cellSize > 15 {
+					if cellSize > minGridCell {
 						r.DrawLine(int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize))
 					}
 					an := numberOfAliveNeigbour(&copy, i, j)
@@ -86,12 +88,12 @@ func main() {
 						// cell := sdl.Rect{X: int32((i + 1) * size), Y: int32((j + 1) * size), H: int32(size), W: int32(size)}
 						// r.SetDrawColor(0, 255, 0, 128)
 						// r.DrawRect(&cell)
-						if an == 1 {
-							gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), cellColorAlone)
+						if an < 2 {
+							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone)
 						} else if an == 2 || an == 3 {
-							gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), cellColor)
+							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColor)
 						} else {
-							gfx.BoxColor(r, int32(wstart+(i+1)*cellSize), int32(hstart+(j+1)*cellSize), int32(wstart+(i+1)*cellSize+cellSize), int32(hstart+(j+1)*cellSize+cellSize), cellColorDying)
+							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorDying)
 						}
 						if start {
 							space[i][j] = an > 1 && an < 4
@@ -121,8 +123,8 @@ func main() {
 				break
 			case *sdl.MouseWheelEvent:
 				mwe := event.(*sdl.MouseWheelEvent)
+
 				cellSize = int(int32(cellSize) + mwe.Y)
-				println(cellSize)
 			case *sdl.KeyboardEvent:
 				ke := event.(*sdl.KeyboardEvent)
 				switch ke.Keysym.Scancode {
@@ -141,7 +143,19 @@ func main() {
 				default:
 					fmt.Println("unknow key:", ke.Keysym.Scancode)
 				}
+			case *sdl.MouseButtonEvent:
+				me := event.(*sdl.MouseButtonEvent)
+				if me.State == 1 {
+					break
+				}
+				col := (int(me.X) - wstart) / cellSize
+				row := (int(me.Y) - hstart) / cellSize
+				if col >= 0 && row >= 0 && col < len(space) && row < len(space[0]) {
+					space[col][row] = !space[col][row]
+				}
 
+				fmt.Printf("%v / %v = %v \n", wend, row, col)
+				fmt.Printf("Button:%v, State: %v, X:%v, Y:%v \n", me.Button, me.State, me.X, me.Y)
 			}
 		}
 	}
