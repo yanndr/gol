@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	gridWidth   = 20
-	gridHeight  = 20
+	gridWidth   = 100
+	gridHeight  = 100
 	width       = 1280
 	height      = 1084
 	minGridCell = 8
@@ -26,6 +26,7 @@ func main() {
 		cellColorAlone = sdl.Color{R: 0, G: 255, B: 255, A: 255}
 		cellColorDying = sdl.Color{R: 255, G: 0, B: 0, A: 255}
 		cellColor      = sdl.Color{R: 255, G: 255, B: 0, A: 255}
+		cellColorNext  = sdl.Color{R: 255, G: 255, B: 0, A: 50}
 	)
 
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -85,9 +86,6 @@ func main() {
 					}
 					an := numberOfAliveNeigbour(&copy, i, j)
 					if copy[i][j] {
-						// cell := sdl.Rect{X: int32((i + 1) * size), Y: int32((j + 1) * size), H: int32(size), W: int32(size)}
-						// r.SetDrawColor(0, 255, 0, 128)
-						// r.DrawRect(&cell)
 						if an < 2 {
 							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone)
 						} else if an == 2 || an == 3 {
@@ -99,8 +97,11 @@ func main() {
 							space[i][j] = an > 1 && an < 4
 						}
 					} else {
-						if start {
-							space[i][j] = an == 3
+						if an == 3 {
+							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorNext)
+							if start {
+								space[i][j] = true
+							}
 						}
 					}
 				}
@@ -113,7 +114,10 @@ func main() {
 		}
 	}()
 
+	b1Click := false
+	actionAdd := false
 	running := true
+	mouseMove := false
 	for running {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch event.(type) {
@@ -145,17 +149,30 @@ func main() {
 				}
 			case *sdl.MouseButtonEvent:
 				me := event.(*sdl.MouseButtonEvent)
-				if me.State == 1 {
-					break
-				}
+				b1Click = me.State == 1
 				col := (int(me.X) - wstart) / cellSize
 				row := (int(me.Y) - hstart) / cellSize
-				if col >= 0 && row >= 0 && col < len(space) && row < len(space[0]) {
-					space[col][row] = !space[col][row]
+				if me.State == 1 {
+					if !mouseMove {
+						space[col][row] = !space[col][row]
+					}
+					mouseMove = false
+				} else {
+
+					if col >= 0 && row >= 0 && col < len(space) && row < len(space[0]) {
+						actionAdd = !space[col][row]
+					}
 				}
 
-				fmt.Printf("%v / %v = %v \n", wend, row, col)
-				fmt.Printf("Button:%v, State: %v, X:%v, Y:%v \n", me.Button, me.State, me.X, me.Y)
+			case *sdl.MouseMotionEvent:
+				me := event.(*sdl.MouseMotionEvent)
+				col := (int(me.X) - wstart) / cellSize
+				row := (int(me.Y) - hstart) / cellSize
+				if b1Click && col >= 0 && row >= 0 && col < len(space) && row < len(space[0]) {
+					mouseMove = true
+					space[col][row] = actionAdd
+				}
+				fmt.Printf("Which:%v, State: %v, X:%v, Y:%v \n", me.Which, me.State, me.X, me.Y)
 			}
 		}
 	}
