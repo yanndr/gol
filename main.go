@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
-	"time"
+	"runtime"
+	"sync"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/ttf"
 )
 
 const (
@@ -18,6 +21,7 @@ const (
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	var (
 		space, copy    [gridWidth][gridHeight]bool
 		bgColor        = sdl.Color{R: 0, G: 0, B: 0, A: 255}
@@ -33,6 +37,11 @@ func main() {
 		panic(err)
 	}
 	defer sdl.Quit()
+
+	if err := ttf.Init(); err != nil {
+		log.Panicf("could not initialize TTF: %v", err)
+	}
+	defer ttf.Quit()
 
 	window, r, err := sdl.CreateWindowAndRenderer(width, height, sdl.WINDOW_SHOWN)
 	if err != nil {
@@ -50,7 +59,6 @@ func main() {
 		cellSize = height / gridHeight
 	}
 
-	//scale := float32(1.0)
 	start := false
 	vpx, vpy := 0, 0
 	iteration := 0
@@ -73,44 +81,45 @@ func main() {
 			r.Clear()
 
 			drawGridEdges(r, int32(wstart), int32(hstart), int32(wend), int32(hend), gridEdgesColor)
-
+			wg := sync.WaitGroup{}
 			for i := 0; i < len(space)-1; i++ {
-				r.SetDrawColor(gridColor.R, gridColor.G, gridColor.B, gridColor.A)
 				if cellSize > minGridCell {
-					r.DrawLine(int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH))
+					drawGridLine(r, int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH), gridColor)
 				}
-				for j := 0; j < len(space[0])-1; j++ {
-					r.SetDrawColor(gridColor.R, gridColor.G, gridColor.B, gridColor.A)
-					if cellSize > minGridCell {
-						r.DrawLine(int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize))
-					}
-					an := numberOfAliveNeigbour(&copy, i, j)
-					if copy[i][j] {
-						if an < 2 {
-							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone)
-						} else if an == 2 || an == 3 {
-							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColor)
-						} else {
-							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorDying)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for j := 0; j < len(space[0])-1; j++ {
+						if cellSize > minGridCell {
+							drawGridLine(r, int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize), gridColor)
 						}
-						if start {
-							space[i][j] = an > 1 && an < 4
-						}
-					} else {
-						if an == 3 {
-							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorNext)
+						an := numberOfAliveNeigbour(&copy, i, j)
+						if copy[i][j] {
+							drawCell(r, an, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone, cellColor, cellColorDying)
 							if start {
-								space[i][j] = true
+								space[i][j] = an > 1 && an < 4
+							}
+						} else {
+							if an == 3 {
+								gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorNext)
+								if start {
+									space[i][j] = true
+								}
 							}
 						}
 					}
-				}
+				}()
+				wg.Wait()
 			}
+			rect := sdl.Rect{X: 0, Y: 0, W: 100, H: 20}
+			print(r, fmt.Sprintf("i: %v", iteration), cellColor, rect)
+
 			r.Present()
 			if start {
 				iteration++
 			}
-			time.Sleep(time.Second / 8)
+
+			//time.Sleep(time.Second / 8)
 		}
 	}()
 
@@ -172,7 +181,6 @@ func main() {
 					mouseMove = true
 					space[col][row] = actionAdd
 				}
-				fmt.Printf("Which:%v, State: %v, X:%v, Y:%v \n", me.Which, me.State, me.X, me.Y)
 			}
 		}
 	}
@@ -213,4 +221,48 @@ func drawGridEdges(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {
 	r.DrawLine(x, y, x, h)
 	r.DrawLine(w, y, w, h)
 	r.DrawLine(x, h, w, h)
+}
+
+func drawGridLine(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {
+	r.SetDrawColor(c.R, c.G, c.B, c.A)
+	r.DrawLine(x, y, w, h)
+}
+
+func drawCell(r *sdl.Renderer, aliveNeigbour int, x, y, w, h int32, c1, c2, c3 sdl.Color) {
+	var color sdl.Color
+	if aliveNeigbour < 2 {
+		color = c1
+	} else if aliveNeigbour == 2 || aliveNeigbour == 3 {
+		color = c2
+	} else {
+		color = c3
+	}
+
+	gfx.BoxColor(r, x, y, w, h, color)
+}
+
+func print(r *sdl.Renderer, text string, c sdl.Color, rect sdl.Rect) error {
+	f, err := ttf.OpenFont("res/Roboto-Regular.ttf", 20)
+	if err != nil {
+		fmt.Errorf("could not load font: %v", err)
+	}
+	defer f.Close()
+
+	s, err := f.RenderUTF8Solid(text, c)
+	if err != nil {
+		return fmt.Errorf("could not render title: %v", err)
+	}
+	defer s.Free()
+
+	t, err := r.CreateTextureFromSurface(s)
+	if err != nil {
+		return fmt.Errorf("could not create texture: %v", err)
+	}
+	defer t.Destroy()
+
+	if err := r.Copy(t, nil, &rect); err != nil {
+		return fmt.Errorf("could not copy texture: %v", err)
+	}
+
+	return nil
 }
