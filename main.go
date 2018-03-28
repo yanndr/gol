@@ -38,6 +38,7 @@ func main() {
 		cellColorDying = sdl.Color{R: 255, G: 0, B: 0, A: 255}
 		cellColor      = sdl.Color{R: 255, G: 255, B: 0, A: 255}
 		cellColorNext  = sdl.Color{R: 255, G: 255, B: 0, A: 0}
+		speed          = time.Second / 8
 	)
 
 	started := false
@@ -57,7 +58,7 @@ func main() {
 		}
 	}()
 
-	gol(&grid, schan, update, &iteration)
+	gol(&grid, schan, update, &iteration, &speed)
 
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
@@ -132,7 +133,7 @@ func main() {
 
 			r.Present()
 
-			time.Sleep(time.Second / 8 / 255)
+			time.Sleep(speed / 255)
 			if started && alpha > 0 {
 				alpha = alpha - 10
 			}
@@ -167,6 +168,23 @@ func main() {
 						alpha = 255
 						schan <- started
 					}
+				case 87:
+					if ke.State == 0 {
+						break
+					}
+					if speed < time.Millisecond {
+						break
+					}
+					speed = speed / 2
+
+				case 86:
+					if ke.State == 0 {
+						break
+					}
+					if speed > time.Second*10 {
+						break
+					}
+					speed = speed * 2
 				default:
 					fmt.Println("unknow key:", ke.Keysym.Scancode)
 				}

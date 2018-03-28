@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func gol(grid *[gridWidth][gridHeight]bool, c <-chan bool, update chan<- bool, iteration *int) {
+func gol(grid *[gridWidth][gridHeight]bool, c <-chan bool, update chan<- bool, iteration *int, speed *time.Duration) {
 	var started bool
 	initGrindRandom(grid, 0.15)
 	go func() {
@@ -17,7 +17,7 @@ func gol(grid *[gridWidth][gridHeight]bool, c <-chan bool, update chan<- bool, i
 					generateNextState(grid)
 					update <- true
 					*iteration++
-					time.Sleep(time.Second / 8)
+					time.Sleep(*speed)
 				}
 			}()
 		}
