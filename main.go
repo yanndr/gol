@@ -5,6 +5,7 @@ import (
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/sdl"
@@ -17,20 +18,46 @@ const (
 	width       = 1280
 	height      = 1084
 	minGridCell = 8
+	livingKey   = "ALIVE"
+	dyingKey    = "DYING"
+	borningKey  = "BORN"
 )
+
+type pos struct {
+	x, y int
+}
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	var (
-		space, copy    [gridWidth][gridHeight]bool
+		grid           [gridWidth][gridHeight]bool
 		bgColor        = sdl.Color{R: 0, G: 0, B: 0, A: 255}
 		gridEdgesColor = sdl.Color{R: 0, G: 255, B: 255, A: 255}
 		gridColor      = sdl.Color{R: 0, G: 255, B: 0, A: 255}
 		cellColorAlone = sdl.Color{R: 0, G: 255, B: 255, A: 255}
 		cellColorDying = sdl.Color{R: 255, G: 0, B: 0, A: 255}
 		cellColor      = sdl.Color{R: 255, G: 255, B: 0, A: 255}
-		cellColorNext  = sdl.Color{R: 255, G: 255, B: 0, A: 50}
+		cellColorNext  = sdl.Color{R: 255, G: 255, B: 0, A: 0}
 	)
+
+	started := false
+	b1Click := false
+	actionAdd := false
+	running := true
+	mouseMove := false
+	iteration := 0
+	schan := make(chan bool)
+	update := make(chan bool)
+
+	alpha := uint8(255)
+	go func() {
+		for {
+			<-update
+			alpha = 255
+		}
+	}()
+
+	gol(&grid, schan, update, &iteration)
 
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
@@ -48,7 +75,6 @@ func main() {
 	}
 	defer window.Destroy()
 
-	copy = space
 	var cellSize int
 	if width/gridWidth < height/gridHeight {
 		cellSize = width / gridWidth
@@ -57,9 +83,8 @@ func main() {
 	}
 
 	vpx, vpy := 0, 0
-	iteration := 0
+
 	var wstart, hstart, wend, hend, gridpxW, gridpxH int
-	copy = space
 	go func() {
 		for {
 
@@ -78,22 +103,23 @@ func main() {
 
 			drawGridEdges(r, int32(wstart), int32(hstart), int32(wend), int32(hend), gridEdgesColor)
 			wg := sync.WaitGroup{}
-			for i := 0; i < len(space)-1; i++ {
+			for i := 0; i < len(grid)-1; i++ {
 				if cellSize > minGridCell {
 					drawGridLine(r, int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH), gridColor)
 				}
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					for j := 0; j < len(space[0])-1; j++ {
+					for j := 0; j < len(grid[0])-1; j++ {
 						if cellSize > minGridCell {
 							drawGridLine(r, int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize), gridColor)
 						}
-						an := numberOfAliveNeigbour(&space, i, j)
-						if space[i][j] {
-							drawCell(r, an, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone, cellColor, cellColorDying)
+						an := numberOfAliveNeigbour(&grid, i, j)
+						if grid[i][j] {
+							drawCell(r, an, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone, cellColor, cellColorDying, alpha)
 						} else {
 							if an == 3 {
+								cellColorNext.A = 255 - alpha
 								gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorNext)
 							}
 						}
@@ -109,16 +135,13 @@ func main() {
 			// 	iteration++
 			// }
 
-			//time.Sleep(time.Second / 8)
+			time.Sleep(time.Microsecond / 255)
+			if started && alpha > 0 {
+				alpha--
+			}
 		}
 	}()
 
-	b1Click := false
-	actionAdd := false
-	running := true
-	mouseMove := false
-	schan := make(chan bool)
-	gol(&space, &copy, schan, &iteration)
 	for running {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch event.(type) {
@@ -143,7 +166,9 @@ func main() {
 					vpy = vpy + 10
 				case 44:
 					if ke.State == 1 {
-						schan <- true
+						started = !started
+						alpha = 255
+						schan <- started
 					}
 				default:
 					fmt.Println("unknow key:", ke.Keysym.Scancode)
@@ -155,13 +180,13 @@ func main() {
 				row := (int(me.Y) - hstart) / cellSize
 				if me.State == 1 {
 					if !mouseMove {
-						space[col][row] = !space[col][row]
+						grid[col][row] = !grid[col][row]
 					}
 					mouseMove = false
 				} else {
 
-					if col >= 0 && row >= 0 && col < len(space) && row < len(space[0]) {
-						actionAdd = !space[col][row]
+					if col >= 0 && row >= 0 && col < len(grid) && row < len(grid[0]) {
+						actionAdd = !grid[col][row]
 					}
 				}
 
@@ -169,9 +194,9 @@ func main() {
 				me := event.(*sdl.MouseMotionEvent)
 				col := (int(me.X) - wstart) / cellSize
 				row := (int(me.Y) - hstart) / cellSize
-				if b1Click && col >= 0 && row >= 0 && col < len(space) && row < len(space[0]) {
+				if b1Click && col >= 0 && row >= 0 && col < len(grid) && row < len(grid[0]) {
 					mouseMove = true
-					space[col][row] = actionAdd
+					grid[col][row] = actionAdd
 				}
 			}
 		}

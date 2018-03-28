@@ -21,14 +21,17 @@ func drawGridLine(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {
 	r.DrawLine(x, y, w, h)
 }
 
-func drawCell(r *sdl.Renderer, aliveNeigbour int, x, y, w, h int32, c1, c2, c3 sdl.Color) {
+func drawCell(r *sdl.Renderer, aliveNeigbour int, x, y, w, h int32, c1, c2, c3 sdl.Color, alpha uint8) {
 	var color sdl.Color
 	if aliveNeigbour < 2 {
 		color = c1
+		color.A = alpha
+
 	} else if aliveNeigbour == 2 || aliveNeigbour == 3 {
 		color = c2
 	} else {
 		color = c3
+		color.A = alpha
 	}
 
 	gfx.BoxColor(r, x, y, w, h, color)
