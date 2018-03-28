@@ -131,13 +131,10 @@ func main() {
 			print(r, fmt.Sprintf("i: %v", iteration), cellColor, rect)
 
 			r.Present()
-			// if start {
-			// 	iteration++
-			// }
 
-			time.Sleep(time.Microsecond / 255)
+			time.Sleep(time.Second / 8 / 255)
 			if started && alpha > 0 {
-				alpha--
+				alpha = alpha - 10
 			}
 		}
 	}()

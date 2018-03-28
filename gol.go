@@ -8,6 +8,7 @@ import (
 
 func gol(grid *[gridWidth][gridHeight]bool, c <-chan bool, update chan<- bool, iteration *int) {
 	var started bool
+	initGrindRandom(grid, 0.15)
 	go func() {
 		for {
 			started = <-c
@@ -16,7 +17,7 @@ func gol(grid *[gridWidth][gridHeight]bool, c <-chan bool, update chan<- bool, i
 					generateNextState(grid)
 					update <- true
 					*iteration++
-					time.Sleep(time.Microsecond)
+					time.Sleep(time.Second / 8)
 				}
 			}()
 		}
