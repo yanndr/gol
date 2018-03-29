@@ -6,22 +6,29 @@ import (
 	"time"
 )
 
-func gol(grid *[gridWidth][gridHeight]bool, c <-chan bool, update chan<- bool, iteration *int, speed *time.Duration) {
-	var started bool
+func gol(grid *[gridWidth][gridHeight]bool, c, quit <-chan bool, speed *time.Duration) chan bool {
+
 	initGrindRandom(grid, 0.15)
+	update := make(chan bool)
 	go func() {
+		started := false
 		for {
-			started = <-c
-			go func() {
-				for started {
-					generateNextState(grid)
-					update <- true
-					*iteration++
-					time.Sleep(*speed)
-				}
-			}()
+			select {
+			case <-quit:
+				return
+			case started = <-c:
+				go func() {
+					for started {
+						generateNextState(grid)
+						update <- true
+						time.Sleep(*speed)
+					}
+				}()
+			}
 		}
 	}()
+
+	return update
 }
 
 func generateNextState(grid *[gridWidth][gridHeight]bool) {
