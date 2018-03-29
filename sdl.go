@@ -17,7 +17,7 @@ const (
 	minGridCell = 8
 )
 
-func run(grid *[gridWidth][gridHeight]bool, start, quit chan<- bool, update <-chan bool, speed *time.Duration) error {
+func run(grid *[gridWidth][gridHeight]bool, process, quitChan chan<- bool, update <-chan bool) error {
 
 	var (
 		bgColor        = sdl.Color{R: 0, G: 0, B: 0, A: 255}
@@ -35,14 +35,30 @@ func run(grid *[gridWidth][gridHeight]bool, start, quit chan<- bool, update <-ch
 		mouseMove = false
 		iteration = 0
 		alpha     = uint8(255)
+		speed     = time.Microsecond
 	)
 
 	go func() {
 		for {
 			<-update
 			iteration++
-			alpha = 255
 		}
+	}()
+
+	startAlphaChan := make(chan bool)
+	quitAlphaChan := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-quitAlphaChan:
+				return
+			case run := <-startAlphaChan:
+				for started && run {
+					processGrid(&alpha, process, &speed)
+				}
+			}
+		}
+
 	}()
 
 	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -117,11 +133,6 @@ func run(grid *[gridWidth][gridHeight]bool, start, quit chan<- bool, update <-ch
 			print(r, fmt.Sprintf("i: %v", iteration), cellColor, rect)
 
 			r.Present()
-
-			time.Sleep(*speed / 255)
-			if started && alpha > 0 {
-				alpha = alpha - 10
-			}
 		}
 	}()
 
@@ -131,8 +142,9 @@ func run(grid *[gridWidth][gridHeight]bool, start, quit chan<- bool, update <-ch
 			case *sdl.QuitEvent:
 				println("Quit")
 				running = false
-				start <- false
-				quit <- true
+				quitAlphaChan <- true
+				quitChan <- true
+
 				break
 			case *sdl.MouseWheelEvent:
 				mwe := event.(*sdl.MouseWheelEvent)
@@ -149,29 +161,32 @@ func run(grid *[gridWidth][gridHeight]bool, start, quit chan<- bool, update <-ch
 					vpy = vpy - 10
 				case 82:
 					vpy = vpy + 10
+				case 40:
+					if ke.State == 1 {
+						go processGrid(&alpha, process, &speed)
+					}
 				case 44:
 					if ke.State == 1 {
 						started = !started
-						alpha = 255
-						start <- started
+						startAlphaChan <- started
 					}
 				case 87:
 					if ke.State == 0 {
-						break
+						continue
 					}
-					if *speed < time.Millisecond {
-						break
+					if speed < time.Microsecond {
+						continue
 					}
-					*speed = *speed / 2
+					speed = speed / 2
 
 				case 86:
 					if ke.State == 0 {
-						break
+						continue
 					}
-					if *speed > time.Second*10 {
-						break
+					if speed > time.Millisecond {
+						continue
 					}
-					*speed = *speed * 2
+					speed = speed * 2
 				default:
 					fmt.Println("unknow key:", ke.Keysym.Scancode)
 				}
@@ -204,6 +219,16 @@ func run(grid *[gridWidth][gridHeight]bool, start, quit chan<- bool, update <-ch
 		}
 	}
 	return nil
+}
+
+func processGrid(alpha *uint8, process chan<- bool, duration *time.Duration) {
+	*alpha = 255
+	for *alpha != 0 {
+		*alpha--
+		//time.Sleep(*duration)
+	}
+	process <- true
+
 }
 
 func drawGridEdges(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {

@@ -3,27 +3,20 @@ package main
 import (
 	"math/rand"
 	"sync"
-	"time"
 )
 
-func gol(grid *[gridWidth][gridHeight]bool, c, quit <-chan bool, speed *time.Duration) chan bool {
+func gol(grid *[gridWidth][gridHeight]bool, process, quit <-chan bool) chan bool {
 
 	initGrindRandom(grid, 0.15)
 	update := make(chan bool)
 	go func() {
-		started := false
 		for {
 			select {
 			case <-quit:
 				return
-			case started = <-c:
-				go func() {
-					for started {
-						generateNextState(grid)
-						update <- true
-						time.Sleep(*speed)
-					}
-				}()
+			case <-process:
+				generateNextState(grid)
+				update <- true
 			}
 		}
 	}()

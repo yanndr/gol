@@ -3,12 +3,11 @@ package main
 import (
 	"log"
 	"runtime"
-	"time"
 )
 
 const (
-	gridWidth  = 100
-	gridHeight = 100
+	gridWidth  = 500
+	gridHeight = 500
 )
 
 type pos struct {
@@ -21,13 +20,12 @@ func main() {
 		grid  [gridWidth][gridHeight]bool
 		start = make(chan bool)
 		quit  = make(chan bool)
-		speed = time.Second / 8
 	)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	update := gol(&grid, start, quit, &speed)
+	update := gol(&grid, start, quit)
 
-	err := run(&grid, start, quit, update, &speed)
+	err := run(&grid, start, quit, update)
 	if err != nil {
 		log.Panicf("err running the SDL rendering: %v,", err)
 	}
