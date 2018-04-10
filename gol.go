@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-func gol(grid *[gridWidth][gridHeight]bool, process, quit <-chan bool) chan bool {
+func gol(grid [][]bool, process, quit <-chan bool) chan bool {
 
 	initGrindRandom(grid, 0.15)
 	update := make(chan bool)
@@ -13,6 +13,7 @@ func gol(grid *[gridWidth][gridHeight]bool, process, quit <-chan bool) chan bool
 		for {
 			select {
 			case <-quit:
+				close(update)
 				return
 			case <-process:
 				generateNextState(grid)
@@ -24,17 +25,22 @@ func gol(grid *[gridWidth][gridHeight]bool, process, quit <-chan bool) chan bool
 	return update
 }
 
-func generateNextState(grid *[gridWidth][gridHeight]bool) {
-	copy := *grid
+func generateNextState(grid [][]bool) {
+	cp := make([][]bool, len(grid))
+	for i := 0; i < len(grid); i++ {
+		cp[i] = make([]bool, len(grid[i]))
+		copy(cp[i], grid[i])
+	}
+
 	wg := sync.WaitGroup{}
-	for i := 0; i < len(grid)-1; i++ {
+	for i := 0; i < len(grid); i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < len(grid[0])-1; j++ {
+			for j := 0; j < len(grid[0]); j++ {
 
-				an := numberOfAliveNeigbour(&copy, i, j)
-				if copy[i][j] {
+				an := numberOfAliveNeigbour(cp, i, j)
+				if cp[i][j] {
 					grid[i][j] = an > 1 && an < 4
 
 				} else {
@@ -46,7 +52,7 @@ func generateNextState(grid *[gridWidth][gridHeight]bool) {
 	}
 }
 
-func initGrindRandom(grid *[gridWidth][gridHeight]bool, probability float32) {
+func initGrindRandom(grid [][]bool, probability float32) {
 	for i := 0; i < len(grid)-1; i++ {
 		for j := 0; j < len(grid[0])-1; j++ {
 			grid[i][j] = rand.Float32() < probability
@@ -54,10 +60,15 @@ func initGrindRandom(grid *[gridWidth][gridHeight]bool, probability float32) {
 	}
 }
 
-func numberOfAliveNeigbour(grid *[gridWidth][gridHeight]bool, x, y int) int {
+func numberOfAliveNeigbour(grid [][]bool, x, y int) int {
 	num := 0
+	w := len(grid)
+	h := len(grid[0])
 	for i := -1; i < 2; i++ {
 		if x+i < 0 {
+			continue
+		}
+		if x+i >= w {
 			continue
 		}
 		for j := -1; j < 2; j++ {
@@ -65,6 +76,9 @@ func numberOfAliveNeigbour(grid *[gridWidth][gridHeight]bool, x, y int) int {
 				continue
 			}
 			if i == 0 && j == 0 {
+				continue
+			}
+			if y+j >= h {
 				continue
 			}
 			if grid[x+i][y+j] {

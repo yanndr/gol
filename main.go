@@ -17,15 +17,20 @@ type pos struct {
 func main() {
 
 	var (
-		grid  [gridWidth][gridHeight]bool
+		grid  [][]bool
 		start = make(chan bool)
 		quit  = make(chan bool)
 	)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	update := gol(&grid, start, quit)
+	grid = make([][]bool, gridWidth)
+	for i := 0; i < len(grid); i++ {
+		grid[i] = make([]bool, gridHeight)
+	}
 
-	err := run(&grid, start, quit, update)
+	update := gol(grid, start, quit)
+
+	err := run(grid, start, quit, update)
 	if err != nil {
 		log.Panicf("err running the SDL rendering: %v,", err)
 	}

@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	width       = 1280
-	height      = 1084
+	width       = 800
+	height      = 600
 	minGridCell = 8
 )
 
-func run(grid *[gridWidth][gridHeight]bool, process, quitChan chan<- bool, update <-chan bool) error {
+func run(grid [][]bool, process, quitChan chan<- bool, update <-chan bool) error {
 
 	var (
 		bgColor        = sdl.Color{R: 0, G: 0, B: 0, A: 255}
@@ -105,14 +105,14 @@ func run(grid *[gridWidth][gridHeight]bool, process, quitChan chan<- bool, updat
 
 			drawGridEdges(r, int32(wstart), int32(hstart), int32(wend), int32(hend), gridEdgesColor)
 			wg := sync.WaitGroup{}
-			for i := 0; i < len(grid)-1; i++ {
+			for i := 0; i < len(grid); i++ {
 				if cellSize > minGridCell {
 					drawGridLine(r, int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH), gridColor)
 				}
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					for j := 0; j < len(grid[0])-1; j++ {
+					for j := 0; j < len(grid[0]); j++ {
 						if cellSize > minGridCell {
 							drawGridLine(r, int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize), gridColor)
 						}
@@ -225,7 +225,7 @@ func processGrid(alpha *uint8, process chan<- bool, duration *time.Duration) {
 	*alpha = 255
 	for *alpha != 0 {
 		*alpha--
-		//time.Sleep(*duration)
+		time.Sleep(*duration)
 	}
 	process <- true
 
