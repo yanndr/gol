@@ -25,49 +25,34 @@ func run(engine *gol.GameOfLife) error {
 		bgColor        = sdl.Color{R: 0, G: 0, B: 0, A: 255}
 		gridEdgesColor = sdl.Color{R: 0, G: 255, B: 255, A: 255}
 		gridColor      = sdl.Color{R: 0, G: 255, B: 0, A: 255}
-		// cellColorAlone = sdl.Color{R: 0, G: 255, B: 255, A: 255}
-		// cellColorDying = sdl.Color{R: 255, G: 0, B: 0, A: 255}
-		cellColor = sdl.Color{R: 255, G: 255, B: 0, A: 255}
-		// cellColorNext  = sdl.Color{R: 255, G: 255, B: 0, A: 0}
+		cellColor      = sdl.Color{R: 255, G: 255, B: 0, A: 255}
 
-		started   = false
+		// started   = false
 		b1Click   = false
 		actionAdd = false
 		running   = true
 		mouseMove = false
 		iteration = 0
-		// alpha     = uint8(255)
-		speed = time.Microsecond
+		speed     = time.Microsecond
 	)
 
-	// go func() {
-	// 	for {
-	// 		<-update
-	// 		iteration++
-	// 	}
-	// }()
-
-	// startAlphaChan := make(chan bool)
-	// quitAlphaChan := make(chan bool)
-	// go func() {
-	// 	for {
-	// 		select {
-	// 		case <-quitAlphaChan:
-	// 			return
-	// 		case run := <-startAlphaChan:
-	// 			for started && run {
-	// 				processGrid(&alpha, process, &speed)
-	// 			}
-	// 		}
-	// 	}
-
-	// }()
+	processStart := make(chan bool)
 
 	go func() {
-		for {
-			if started {
-				processGrid(engine, &speed)
-				//time.Sleep(*duration)
+
+		for <-processStart {
+			processTicker := time.NewTicker(time.Microsecond * 30)
+			defer processTicker.Stop()
+			alive := true
+			for alive {
+				select {
+				case <-processTicker.C:
+					engine.Process()
+					iteration++
+				case <-processStart:
+					alive = false
+				}
+
 			}
 		}
 	}()
@@ -98,57 +83,54 @@ func run(engine *gol.GameOfLife) error {
 	vpx, vpy := 0, 0
 
 	grid := engine.Grid()
+	ticker := time.Tick(time.Microsecond * 17)
+	quit := make(chan bool)
 
 	var wstart, hstart, wend, hend, gridpxW, gridpxH int
 	go func() {
-		for running {
+		for {
+			select {
+			case <-ticker:
+				wstart = (width - cellSize*gridWidth) / 2
+				hstart = (height - cellSize*gridHeight) / 2
+				wstart += vpx
+				hstart += vpy
+				wend = wstart + cellSize*gridWidth
+				hend = hstart + cellSize*gridHeight
 
-			wstart = (width - cellSize*gridWidth) / 2
-			hstart = (height - cellSize*gridHeight) / 2
-			wstart += vpx
-			hstart += vpy
-			wend = wstart + cellSize*gridWidth
-			hend = hstart + cellSize*gridHeight
+				gridpxW = cellSize * gridWidth
+				gridpxH = cellSize * gridHeight
 
-			gridpxW = cellSize * gridWidth
-			gridpxH = cellSize * gridHeight
+				r.SetDrawColor(bgColor.R, bgColor.G, bgColor.B, bgColor.A)
+				r.Clear()
 
-			r.SetDrawColor(bgColor.R, bgColor.G, bgColor.B, bgColor.A)
-			r.Clear()
-
-			drawGridEdges(r, int32(wstart), int32(hstart), int32(wend), int32(hend), gridEdgesColor)
-			wg := sync.WaitGroup{}
-			for i := 0; i < len(grid); i++ {
-				if cellSize > minGridCell {
-					drawGridLine(r, int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH), gridColor)
-				}
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for j := 0; j < len(grid[0]); j++ {
-						if cellSize > minGridCell {
-							drawGridLine(r, int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize), gridColor)
-						}
-						// an := numberOfAliveNeigbour(grid, i, j)
-						// if grid[i][j] {
-						// 	drawCell(r, an, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorAlone, cellColor, cellColorDying, alpha)
-						// } else {
-						// 	if an == 3 {
-						// 		cellColorNext.A = 255 - alpha
-						// 		gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColorNext)
-						// 	}
-						// }
-						if grid[i][j] {
-							gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColor)
-						}
+				drawGridEdges(r, int32(wstart), int32(hstart), int32(wend), int32(hend), gridEdgesColor)
+				wg := sync.WaitGroup{}
+				for i := 0; i < len(grid); i++ {
+					if cellSize > minGridCell {
+						drawGridLine(r, int32(wstart+(i+1)*cellSize), int32(hstart), int32(wstart+(i+1)*cellSize), int32(hstart+gridpxH), gridColor)
 					}
-				}()
-				wg.Wait()
-			}
-			rect := sdl.Rect{X: 0, Y: 0, W: 100, H: 20}
-			print(r, fmt.Sprintf("i: %v", iteration), cellColor, rect)
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						for j := 0; j < len(grid[0]); j++ {
+							if cellSize > minGridCell {
+								drawGridLine(r, int32(wstart), int32(hstart+(j+1)*cellSize), int32(wstart+gridpxW), int32(hstart+(j+1)*cellSize), gridColor)
+							}
+							if grid[i][j] {
+								gfx.BoxColor(r, int32(wstart+(i)*cellSize), int32(hstart+(j)*cellSize), int32(wstart+(i)*cellSize+cellSize), int32(hstart+(j)*cellSize+cellSize), cellColor)
+							}
+						}
+					}()
+					wg.Wait()
+				}
+				rect := sdl.Rect{X: 0, Y: 0, W: 100, H: 20}
+				print(r, fmt.Sprintf("i: %v", iteration), cellColor, rect)
 
-			r.Present()
+				r.Present()
+			case <-quit:
+				return
+			}
 		}
 	}()
 
@@ -158,8 +140,10 @@ func run(engine *gol.GameOfLife) error {
 			case *sdl.QuitEvent:
 				println("Quit")
 				running = false
-				// quitAlphaChan <- true
-				// quitChan <- true
+				quit <- true
+				// processStart <- false
+				close(quit)
+				close(processStart)
 
 				break
 			case *sdl.MouseWheelEvent:
@@ -179,12 +163,12 @@ func run(engine *gol.GameOfLife) error {
 					vpy = vpy + 10
 				case 40:
 					if ke.State == 1 {
-						go processGrid(engine, &speed)
+						engine.Process()
+						iteration++
 					}
 				case 44:
 					if ke.State == 1 {
-						started = !started
-						// startAlphaChan <- started
+						processStart <- true
 					}
 				case 87:
 					if ke.State == 0 {
@@ -237,17 +221,6 @@ func run(engine *gol.GameOfLife) error {
 	return nil
 }
 
-func processGrid(engine *gol.GameOfLife, duration *time.Duration) {
-	// *alpha = 255
-	// for *alpha != 0 {
-	// 	*alpha--
-	// 	time.Sleep(*duration)
-	// }
-
-	engine.Process()
-
-}
-
 func drawGridEdges(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {
 	r.SetDrawColor(c.R, c.G, c.B, c.A)
 	r.DrawLine(x, y, w, y)
@@ -260,22 +233,6 @@ func drawGridLine(r *sdl.Renderer, x, y, w, h int32, c sdl.Color) {
 	r.SetDrawColor(c.R, c.G, c.B, c.A)
 	r.DrawLine(x, y, w, h)
 }
-
-// func drawCell(r *sdl.Renderer, aliveNeigbour int, x, y, w, h int32, c1, c2, c3 sdl.Color, alpha uint8) {
-// 	var color sdl.Color
-// 	if aliveNeigbour < 2 {
-// 		color = c2
-// 		color.A = alpha
-
-// 	} else if aliveNeigbour == 2 || aliveNeigbour == 3 {
-// 		color = c2
-// 	} else {
-// 		color = c2
-// 		color.A = alpha
-// 	}
-
-// 	gfx.BoxColor(r, x, y, w, h, color)
-// }
 
 func print(r *sdl.Renderer, text string, c sdl.Color, rect sdl.Rect) error {
 	f, err := ttf.OpenFont("res/Roboto-Regular.ttf", 20)

@@ -16,6 +16,8 @@ func New(width, height int) *GameOfLife {
 	for i := 0; i < width; i++ {
 		g.grid[i] = make([]bool, height)
 	}
+
+	initGrindRandom(g.grid, .05)
 	return &g
 }
 
