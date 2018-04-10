@@ -1,11 +1,58 @@
-package main
+package gol
 
 import (
 	"math/rand"
 	"sync"
 )
 
-func gol(grid [][]bool, process, quit <-chan bool) chan bool {
+type GameOfLife struct {
+	grid [][]bool
+}
+
+func New(width, height int) *GameOfLife {
+
+	g := GameOfLife{}
+	g.grid = make([][]bool, width)
+	for i := 0; i < width; i++ {
+		g.grid[i] = make([]bool, height)
+	}
+	return &g
+}
+
+func (g *GameOfLife) Grid() [][]bool {
+	return g.grid
+}
+
+func (g *GameOfLife) Process() {
+	w := len(g.grid)
+	h := len(g.grid)
+	cp := make([][]bool, w)
+	for i := 0; i < w; i++ {
+		cp[i] = make([]bool, h)
+		copy(cp[i], g.grid[i])
+	}
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < w; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < h; j++ {
+
+				an := numberOfAliveNeigbour(cp, i, j)
+				if cp[i][j] {
+					g.grid[i][j] = an > 1 && an < 4
+
+				} else {
+					g.grid[i][j] = an == 3
+				}
+			}
+		}()
+		wg.Wait()
+	}
+}
+
+func Run(grid [][]bool, process, quit <-chan bool) chan bool {
 
 	initGrindRandom(grid, 0.15)
 	update := make(chan bool)

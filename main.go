@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"runtime"
+
+	"github.com/yanndr/gol/engine/gol"
 )
 
 const (
@@ -16,21 +18,11 @@ type pos struct {
 
 func main() {
 
-	var (
-		grid  [][]bool
-		start = make(chan bool)
-		quit  = make(chan bool)
-	)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	grid = make([][]bool, gridWidth)
-	for i := 0; i < len(grid); i++ {
-		grid[i] = make([]bool, gridHeight)
-	}
+	g := gol.New(gridWidth, gridHeight)
 
-	update := gol(grid, start, quit)
-
-	err := run(grid, start, quit, update)
+	err := run(g)
 	if err != nil {
 		log.Panicf("err running the SDL rendering: %v,", err)
 	}
